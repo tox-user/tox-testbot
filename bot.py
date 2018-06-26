@@ -22,26 +22,32 @@ class ToxOptions():
 
 
 class BotThread (threading.Thread):
-	def __init__(self, thread_id):
+	def __init__(self, thread_id, num_iterations, external_tox_id):
 		threading.Thread.__init__(self)
 		self.thread_id = thread_id
+		self.external_friend = external_tox_id
+		self.num_iterations = num_iterations
+
 	def run(self):
 		opts = ToxOptions()
-		bot = TestBot(self.thread_id, self.name, opts)
+		bot = TestBot(self.thread_id, self.num_iterations, self.external_friend, opts)
 		bot.loop()
 
 
 class TestBot(Tox):
-	def __init__(self, bot_id, thread_name, opts=None):
+	def __init__(self, bot_id, num_iterations, external_tox_id, opts=None):
 		if opts is not None:
 			super(TestBot, self).__init__(opts)
 
 		self.bot_id = bot_id
-		self.thread_name = thread_name
+		self.external_friend = external_tox_id
+		self.num_iterations = num_iterations
+
 		self.self_set_name(str("testbot%d" % bot_id))
 		tox_id = self.self_get_address()
 		bot_public_keys.append(tox_id)
 		print("ID: %s" % tox_id)
+
 		self.connect()
 
 	def connect(self):
@@ -59,6 +65,15 @@ class TestBot(Tox):
 				print("%d connected to DHT" % self.bot_id)
 				checked = True
 				self.conference_new()
+
+				external_friend = self.external_friend
+				if external_friend and external_friend != "":
+					try:
+						print("%d adding external ID %s" % (self.bot_id, external_friend))
+						self.friend_add(external_friend, "hi")
+					except:
+						pass
+
 				for friend in bot_public_keys:
 					if friend == self.self_get_address():
 						continue
@@ -84,7 +99,7 @@ class TestBot(Tox):
 				checked = False
 
 			iterations += 1
-			if iterations >= NUM_ITERATIONS:
+			if iterations >= self.num_iterations:
 				iterations = 0
 				self.random_group_action()
 
@@ -108,7 +123,7 @@ class TestBot(Tox):
 
 	def random_group_action(self):
 		groups = self.conference_get_chatlist()
-		if len(groups) <= 0:
+		if len(groups) <= 0 and not self.self_get_connection_status():
 			return
 
 		rand = randint(0,2)
